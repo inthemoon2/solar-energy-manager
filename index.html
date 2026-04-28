@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>☀️ 스마트 태양광 에너지</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0F172A;--card:#1E293B;--bd:#334155;--tx:#F1F5F9;--mt:#94A3B8;
+  --sun:#F59E0B;--gn:#22C55E;--rd:#EF4444;--pu:#A78BFA;--bl:#3B82F6;
+  --r:8px;--hh:42px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:auto;background:var(--bg);color:var(--tx);
+  font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;font-size:13px;}
+
+/* 헤더 */
+header{height:var(--hh);background:#1a0e00;border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex-shrink:0;}
+.hd-l{display:flex;align-items:center;gap:7px;font-size:.82rem;font-weight:700;color:var(--sun);}
+#sdot{width:7px;height:7px;border-radius:50%;background:var(--rd);animation:pulse 2s infinite;flex-shrink:0;}
+#sdot.live{background:var(--gn);}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.5);}}
+#lpow{font-size:10px;padding:2px 8px;border-radius:16px;background:rgba(245,158,11,.15);color:var(--sun);font-weight:600;}
+.hd-r{display:flex;align-items:center;gap:5px;}
+.hbtn{background:transparent;border:1px solid var(--bd);border-radius:5px;
+  color:var(--mt);padding:3px 7px;cursor:pointer;font-size:10px;}
+.hbtn:hover{border-color:var(--sun);color:var(--sun);}
+#ts{font-size:9px;color:var(--mt);}
+
+/* 데모 패널 */
+#dp{background:#1a2744;border-bottom:1px solid #3B5998;overflow:hidden;
+  max-height:0;transition:max-height .3s;flex-shrink:0;}
+#dp.open{max-height:200px;}
+.dpin{padding:7px 12px;display:grid;grid-template-columns:auto auto auto auto auto 1fr;gap:8px;align-items:center;}
+.dlbl{font-size:10px;color:var(--mt);white-space:nowrap;}
+.sc-btn,.sp-btn{padding:2px 7px;border:1px solid var(--bd);border-radius:14px;
+  background:transparent;color:var(--mt);cursor:pointer;font-size:10px;}
+.sc-btn.on{background:#1e3a8a;border-color:#60A5FA;color:#93C5FD;}
+.sp-btn.on{background:#451a03;border-color:var(--sun);color:var(--sun);}
+.drange{accent-color:var(--sun);width:100px;}
+#effv,#dhv{font-size:10px;color:var(--sun);font-weight:600;width:30px;}
+.dp-note{font-size:9px;color:var(--mt);grid-column:1/-1;}
+
+/* 메인 2열 */
+#wrap{
+  display:flex;
+  min-height:calc(100vh - var(--hh));
+  gap:7px;padding:7px;
+  overflow:visible;
+}
+#wrap.dp-open{min-height:calc(100vh - var(--hh) - 200px);}
+
+/* 좌측: 발전 정보 */
+#left{width:38%;display:flex;flex-direction:column;gap:7px;flex-shrink:0;align-self:flex-start;position:sticky;top:7px;}
+
+/* 우측: 가전 제어 */
+#right{flex:1;display:flex;flex-direction:column;gap:7px;}
+
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:9px;}
+.lbl{font-size:9px;font-weight:600;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;}
+
+/* 발전량 카드 */
+.pnum{font-size:2.6rem;font-weight:800;color:var(--sun);line-height:1;letter-spacing:-2px;}
+.punit{font-size:.9rem;color:var(--mt);margin-left:2px;}
+.pbar{height:7px;background:var(--bd);border-radius:4px;overflow:hidden;margin:5px 0 3px;}
+.pbarf{height:100%;border-radius:4px;background:linear-gradient(90deg,#F59E0B,#FCD34D);transition:width .8s;}
+.fml{background:var(--bg);border-radius:6px;padding:5px 8px;font-size:10px;
+  color:var(--mt);line-height:1.9;margin-top:5px;}
+
+/* 계수 게이지 */
+.grow{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
+.glbl{font-size:10px;color:var(--mt);width:56px;flex-shrink:0;}
+.gbar{flex:1;height:6px;background:var(--bd);border-radius:3px;overflow:hidden;}
+.gbf{height:100%;border-radius:3px;transition:width .5s;}
+.gval{font-size:10px;font-weight:600;width:26px;text-align:right;}
+
+/* 타임라인 */
+.tlw{position:relative;height:16px;margin:5px 0 2px;}
+.tlbg{position:absolute;top:4px;left:0;right:0;height:8px;background:var(--bd);border-radius:4px;}
+.tlpk{position:absolute;top:4px;height:8px;background:rgba(245,158,11,.35);
+  border-radius:4px;transition:left .8s,width .8s,opacity .8s;}
+.tlnw{position:absolute;top:0;width:2px;height:16px;background:var(--rd);
+  border-radius:2px;transition:left .5s;z-index:2;}
+.tllbl{display:flex;justify-content:space-between;font-size:8px;color:var(--mt);}
+
+/* 날씨 (컴팩트) */
+.wx{display:flex;align-items:center;gap:8px;}
+#wico{font-size:1.4rem;}
+.wxd{font-size:12px;font-weight:600;}
+.wxs{font-size:9px;color:var(--mt);}
+
+/* 차트 */
+.chwrap{position:relative;height:72px;}
+
+/* 절약 요약 */
+.sv-row{display:flex;align-items:baseline;gap:6px;}
+.sv-n{font-size:1.6rem;font-weight:800;color:var(--gn);}
+.sv-u{font-size:11px;color:var(--mt);}
+.sv-sub{font-size:10px;color:var(--mt);margin-top:2px;}
+.co2t{font-size:9px;color:#6EE7B7;margin-top:3px;
+  background:rgba(34,197,94,.07);border-radius:4px;padding:3px 7px;}
+
+/* 가전 제어 우측 */
+#right-top{flex-shrink:0;}
+#app-list{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start;align-items:start;}
+
+
+/* 가전 카드 */
+.ac{border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;transition:border-color .3s;height:auto;}
+.ac.ac-on{border-color:var(--gn);}
+.ac.ac-lock{border-color:var(--pu);}
+.ac.ac-done{border-color:rgba(34,197,94,.4);}
+.ac.ac-warn{border-color:var(--rd);}
+.ac.ac-unsel{opacity:.55;}
+.ac-top{display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;}
+.ac-ico{font-size:1.2rem;flex-shrink:0;}
+.ac-info{flex:1;min-width:0;}
+.ac-name{font-size:11px;font-weight:600;}
+.ac-spec{font-size:8px;color:var(--mt);margin-top:1px;line-height:1.3;}
+.ac-chk{width:16px;height:16px;accent-color:var(--sun);cursor:pointer;flex-shrink:0;}
+/* 상태 배지 */
+.stbadge{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.sb{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
+  border-radius:14px;font-size:10px;font-weight:700;}
+.sb-off{background:var(--bd);color:var(--mt);}
+.sb-on{background:var(--gn);color:#000;}
+.sb-lock{background:var(--pu);color:#fff;}
+.sb-done{background:rgba(34,197,94,.2);color:var(--gn);border:1px solid rgba(34,197,94,.4);}
+.sb-warn{background:rgba(239,68,68,.2);color:var(--rd);}
+/* 가전 상세 정보 */
+.ac-detail{padding:0 7px 6px;border-top:1px solid var(--bd);background:rgba(0,0,0,.12);overflow:visible;}
+/* 시간 정보 */
+/* 6칸 한 줄 그리드 */
+.ac-info-row{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;padding:4px 0;}
+.ac-iitem{background:var(--bg);border-radius:4px;padding:3px 4px;text-align:center;min-width:0;}
+.ac-ilbl{font-size:8px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+.ac-ival{font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+/* 스케줄 추천 */
+.ac-sched{font-size:9px;border-radius:4px;padding:4px 7px;margin-top:4px;line-height:1.5;}
+.as-ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#86EFAC;}
+.as-wait{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:#FCD34D;}
+.as-bad{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#FCA5A5;}
+/* 진행 바 */
+.cyc-bar{height:4px;background:var(--bd);border-radius:2px;margin:5px 0;overflow:hidden;}
+.cyc-barf{height:100%;background:var(--pu);border-radius:2px;transition:width .5s;}
+
+/* 결과 요약 배너 */
+
+/* 모달 */
+.mov{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;
+  align-items:center;justify-content:center;z-index:300;padding:14px;}
+.modal{background:var(--card);border:1px solid var(--bd);border-radius:12px;
+  padding:16px;width:100%;max-width:360px;max-height:85vh;overflow-y:auto;}
+.modal h2{color:var(--sun);font-size:.88rem;margin-bottom:4px;}
+.modal p{color:var(--mt);font-size:10px;margin-bottom:10px;line-height:1.5;}
+.fld{margin-bottom:8px;}
+.fld label{display:block;font-size:10px;color:var(--mt);margin-bottom:2px;}
+.fld input,.fld select{width:100%;background:var(--bg);border:1px solid var(--bd);
+  border-radius:6px;color:var(--tx);font-size:12px;padding:6px 8px;outline:none;}
+.fld input:focus,.fld select:focus{border-color:var(--sun);}
+.g2f{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.mbtn{width:100%;padding:8px;border:none;border-radius:7px;font-weight:700;
+  font-size:12px;cursor:pointer;margin-top:3px;}
+.mbtn-p{background:var(--sun);color:#000;}
+.mbtn-s{background:transparent;border:1px solid var(--bd);color:var(--mt);margin-top:4px;}
+.ali{display:flex;align-items:center;gap:7px;padding:6px 8px;
+  border:1px solid var(--bd);border-radius:6px;margin-bottom:5px;}
+.adl{background:transparent;border:none;color:var(--mt);cursor:pointer;font-size:13px;}
+.adl:hover{color:var(--rd);}
+.icg{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;}
+.ico{font-size:1.2rem;padding:3px 6px;border:1px solid var(--bd);
+  border-radius:5px;cursor:pointer;}
+.ico:hover,.ico.s{border-color:var(--sun);background:rgba(245,158,11,.1);}
+
+
+/* ── 반응형 브레이크포인트 ── */
+
+/* 1400px 이상: 기본 레이아웃 */
+/* 1100~1400px: 약간 축소 */
+@media(max-width:1400px){
+  .pnum{font-size:2.2rem;}
+  .ac-name{font-size:10px;}
+  #left{width:36%;}
+}
+
+/* 900~1100px: 2열 → 좌우 비율 조정 */
+@media(max-width:1100px){
+  #left{width:34%;}
+  .pnum{font-size:2rem;}
+  .fml{font-size:9px;}
+  .ac-spec{font-size:7px;}
+  .ac-ilbl{font-size:7px;}
+  .ac-ival{font-size:9px;}
+}
+
+/* 768px 이하: 세로 스택 */
+@media(max-width:768px){
+  html,body{overflow:auto;}
+  #wrap{flex-direction:column;height:auto;overflow:visible;}
+  #wrap.dp-open{height:auto;}
+  #left{width:100%;}
+  #app-list{grid-template-columns:1fr;}
+  .pnum{font-size:2.6rem;}
+  .ac-ilbl{font-size:8px;}
+  .ac-ival{font-size:10px;}
+  /* 데모 패널 세로 배치 */
+  .dpin{grid-template-columns:auto 1fr;row-gap:4px;}
+}
+
+/* 480px 이하: 모바일 */
+@media(max-width:480px){
+  header{padding:0 8px;}
+  .hd-l{font-size:.75rem;gap:5px;}
+  #wrap{padding:5px;gap:5px;}
+  .card{padding:7px;}
+  #app-list{grid-template-columns:1fr;}
+  .ac-info-row{grid-template-columns:repeat(3,1fr);gap:3px;}
+  .dpin{display:flex;flex-direction:column;gap:5px;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd-l">
+    <span id="sdot"></span>☀️ 스마트 태양광 (3kW)
+    <span id="lpow">0 W</span>
+  </div>
+  <div class="hd-r">
+    <span id="ts">대기중</span>
+    <span id="loc" style="font-size:9px;color:var(--mt);">📍 목포</span>
+    <button class="hbtn" onclick="openSetM()">⚙ 설정</button>
+    <button class="hbtn" onclick="openAppM()">🏠 가전</button>
+    <button class="hbtn" onclick="togDP()">🎭 데모</button>
+  </div>
+</header>
+
+<!-- 데모 패널 -->
+<div id="dp">
+  <div class="dpin">
+    <span class="dlbl">날씨</span>
+    <div style="display:flex;gap:3px;">
+      <button class="sc-btn on" id="sc0" onclick="setSc(0)">☀️맑음</button>
+      <button class="sc-btn" id="sc1" onclick="setSc(1)">🌤️구름</button>
+      <button class="sc-btn" id="sc2" onclick="setSc(2)">⛅많음</button>
+      <button class="sc-btn" id="sc3" onclick="setSc(3)">☁️흐림</button>
+      <button class="sc-btn" id="sc4" onclick="setSc(4)">🌧️비</button>
+    </div>
+    <span class="dlbl">시간</span>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <input type="range" class="drange" id="dh" min="0" max="23.99" step="0.25" value="9" oninput="onHS(this.value)">
+      <span id="dhv">9:00</span>
+    </div>
+    <span class="dlbl">배속</span>
+    <div style="display:flex;gap:3px;">
+      <button class="sp-btn on" id="sp1" onclick="setSp(1,this)">1×</button>
+      <button class="sp-btn" id="sp5" onclick="setSp(5,this)">5×</button>
+      <button class="sp-btn" id="sp20" onclick="setSp(20,this)">20×</button>
+      <button class="sp-btn" id="sp60" onclick="setSp(60,this)">60×</button>
+      <button class="sp-btn" id="sp0" onclick="setSp(0,this)">⏸</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <span class="dlbl">패널효율</span>
+      <input type="range" class="drange" id="deff" min="0.3" max="1" step="0.01" value="0.9"
+        oninput="document.getElementById('effv').textContent=Math.round(this.value*100)+'%'">
+      <span id="effv">90%</span>
+    </div>
+    <p class="dp-note">💡 데모: 가전 선택은 우측 "오늘 전기 사용 계획"에서 체크하세요 · Firebase 연결 시 이 패널 불필요</p>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="wrap">
+
+  <!-- 좌측: 발전 정보 -->
+  <div id="left">
+
+    <!-- 발전량 -->
+    <div class="card">
+      <div class="lbl">⚡ 지금 발전량</div>
+      <div class="pnum"><span id="vp">0</span><span class="punit">W</span></div>
+      <div class="pbar"><div class="pbarf" id="pb" style="width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--mt);margin-bottom:4px;"><span>0W</span><span>최대 3,000W</span></div>
+      <!-- 현재 사용 전력 -->
+      <div id="usage-box" style="display:flex;align-items:center;justify-content:space-between;
+        background:var(--bg);border-radius:6px;padding:5px 8px;margin-bottom:5px;border:1px solid var(--bd);">
+        <div>
+          <div style="font-size:8px;color:var(--mt);margin-bottom:1px;">🔌 현재 사용 전력</div>
+          <div style="font-size:1.1rem;font-weight:700;" id="vcur">0 <span style="font-size:.7rem;color:var(--mt);">W</span></div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:8px;color:var(--mt);margin-bottom:1px;">선택 합계</div>
+          <div style="font-size:.85rem;font-weight:600;" id="vsel">0 <span style="font-size:.65rem;color:var(--mt);">W</span></div>
+        </div>
+      </div>
+      <!-- 초과 경고 -->
+      <div id="overload-warn" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);
+        border-radius:6px;padding:5px 8px;font-size:9px;color:#FCA5A5;margin-bottom:5px;line-height:1.5;">
+        ⚡ <strong>용량 초과!</strong> 선택한 가전을 동시에 작동하면 <span id="vover">0</span>W가 3,000W를 초과합니다.<br>
+        일부 가전의 선택을 해제하거나 순차 작동을 권장합니다.
+      </div>
+      <div class="fml">
+        3000W × <span id="fc" style="color:#F59E0B;font-weight:600;">CdS-</span>
+        × <span id="fw" style="color:#60A5FA;font-weight:600;">날씨-</span>
+        × <span id="ft" style="color:#34D399;font-weight:600;">시간-</span>
+        = <span id="fr" style="color:var(--sun);font-weight:700;font-size:.95rem;">-</span>W
+      </div>
+    </div>
+
+    <!-- 계수 + 날씨 -->
+    <div class="card">
+      <div class="wx" style="margin-bottom:7px;">
+        <div id="wico" style="font-size:1.3rem;">—</div>
+        <div><div class="wxd" id="wdesc">-</div>
+          <div class="wxs">구름<span id="wcl">-</span>% · 외부<span id="wot">-</span>°C · 실내<span id="vt">-</span>°C</div>
+        </div>
+      </div>
+      <div class="grow"><div class="glbl">🔆 CdS 조도</div><div class="gbar"><div class="gbf" id="bc" style="width:0%;background:#F59E0B;"></div></div><div class="gval" id="tc" style="color:#F59E0B;">0.00</div></div>
+      <div class="grow"><div class="glbl">☁️ 날씨 API</div><div class="gbar"><div class="gbf" id="bw" style="width:0%;background:#60A5FA;"></div></div><div class="gval" id="tw" style="color:#60A5FA;">0.00</div></div>
+      <div class="grow"><div class="glbl">🕐 시간대</div><div class="gbar"><div class="gbf" id="bt" style="width:0%;background:#34D399;"></div></div><div class="gval" id="tt" style="color:#34D399;">0.00</div></div>
+    </div>
+
+    <!-- 타임라인 -->
+    <div class="card">
+      <div class="lbl">⏰ 오늘 발전 시간대 <span id="tlnote" style="font-weight:400;text-transform:none;font-size:8px;color:var(--mt);"></span></div>
+      <div class="tlw">
+        <div class="tlbg"></div>
+        <div class="tlpk" id="tlp" style="left:25%;width:50%;"></div>
+        <div class="tlnw" id="tln" style="left:25%;"></div>
+      </div>
+      <div class="tllbl"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>24시</span></div>
+      <div style="font-size:8px;color:var(--mt);margin-top:3px;">▸ ESS 없음 — 발전 즉시 소비 방식 (저장 불가)</div>
+    </div>
+
+    <!-- 절약 요약 -->
+    <div class="card">
+      <div class="lbl">💰 오늘 가전 사용 실적</div>
+      <div class="sv-row">
+        <div class="sv-n" id="vsave">0</div><div class="sv-u">원</div>
+        <div style="font-size:9px;color:var(--mt);">절약 (태양광 대체)</div>
+      </div>
+      <div class="sv-sub">실제 사용 <span id="vkwh">0.00</span> kWh · 단가 <span id="vrate">150</span>원/kWh</div>
+      <div class="co2t">🌿 CO₂ <span id="vco2">0.000</span> kg 절감</div>
+    </div>
+
+    <!-- 차트 -->
+    <div class="card" style="flex:1;min-height:0;">
+      <div class="lbl">📈 발전량 추이 (24시간)</div>
+      <div class="chwrap" style="height:calc(100% - 18px);"><canvas id="pwc"></canvas></div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- 우측: 가전 제어 -->
+  <div id="right">
+    <div class="card" id="right-top" style="flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="lbl" style="margin:0;">🏠 오늘 전기 사용 계획 · 가전 작동 현황</div>
+        <div style="display:flex;gap:5px;">
+          <button class="hbtn" onclick="openAppM()">+ 가전 등록</button>
+          <button class="hbtn" onclick="resetAll()" style="border-color:rgba(239,68,68,.4);color:var(--rd);">↺ 초기화</button>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--mt);margin-top:3px;">
+        체크한 가전만 발전량 기준 도달 시 자동 ON · 사이클 중 날씨 변해도 계속 작동
+      </div>
+    </div>
+
+
+    <!-- 가전 카드 목록 -->
+    <div id="app-list"></div>
+
+  </div><!-- /right -->
+
+</div><!-- /wrap -->
+
+<!-- 설정 모달 -->
+<div class="mov" id="setm" style="display:none;">
+  <div class="modal">
+    <h2>⚙️ 설정</h2>
+    <p>지역 및 Firebase 연결 정보를 입력하세요.</p>
+    <div class="fld"><label>📍 지역</label>
+      <select id="csel" onchange="document.getElementById('ccf').style.display=this.value==='c'?'block':'none';">
+        <option value="Mokpo">목포</option><option value="Gwangju">광주</option>
+        <option value="Seoul">서울</option><option value="Busan">부산</option>
+        <option value="Yeosu">여수</option><option value="Suncheon">순천</option>
+        <option value="Naju">나주</option><option value="Jindo">진도</option>
+        <option value="Haenam">해남</option><option value="Goheung">고흥</option>
+        <option value="c">직접 입력</option>
+      </select>
+    </div>
+    <div class="fld" id="ccf" style="display:none;"><label>도시명(영문)</label><input type="text" id="ccity"></div>
+    <div class="fld"><label>전기 단가 (원/kWh)</label><input type="number" id="erate" value="150" min="1"></div>
+    <div class="fld"><label>Firebase Database URL</label><input type="text" id="fburl" placeholder="your-project.firebaseio.com"></div>
+    <div class="fld"><label>Firebase API Key</label><input type="text" id="fbapikey" placeholder="AIzaSy..."></div>
+    <div class="fld"><label>Firebase Project ID</label><input type="text" id="fbpid" placeholder="your-project-id"></div>
+    <button class="mbtn mbtn-p" onclick="saveSet()">💾 저장 및 연결</button>
+    <button class="mbtn mbtn-s" onclick="closeM('setm')">취소</button>
+    <button class="mbtn mbtn-s" onclick="startDemo();closeM('setm');">📊 데모로 보기</button>
+  </div>
+</div>
+
+<!-- 가전 등록 모달 -->
+<div class="mov" id="appm" style="display:none;">
+  <div class="modal">
+    <h2>🏠 가전 등록 / 관리</h2>
+    <p><b>작동 기준(W)</b> = 이 발전량 이상일 때 ON<br>
+       <b>소비 전력(W)</b> = 켜져 있는 동안 실제 소비량<br>
+       두 값이 다를 수 있습니다 (세탁기: 기준 600W, 소비 500W)</p>
+    <div id="alm"></div>
+    <div style="border-top:1px solid var(--bd);margin:10px 0;padding-top:10px;">
+      <div style="font-size:10px;font-weight:600;color:var(--mt);margin-bottom:7px;">새 가전 추가</div>
+      <div class="fld"><label>아이콘</label>
+        <div class="icg" id="icog">
+          <span class="ico s" onclick="selIco(this)">💨</span>
+          <span class="ico" onclick="selIco(this)">🫧</span>
+          <span class="ico" onclick="selIco(this)">🍽️</span>
+          <span class="ico" onclick="selIco(this)">♨️</span>
+          <span class="ico" onclick="selIco(this)">❄️</span>
+          <span class="ico" onclick="selIco(this)">🔥</span>
+          <span class="ico" onclick="selIco(this)">📺</span>
+          <span class="ico" onclick="selIco(this)">💡</span>
+        </div>
+      </div>
+      <div class="fld"><label>가전 이름</label><input type="text" id="nn" placeholder="예: 세탁기"></div>
+      <div class="g2f">
+        <div class="fld"><label>작동 기준 (W)</label><input type="number" id="nminw" placeholder="600" min="1"></div>
+        <div class="fld"><label>소비 전력 (W)</label><input type="number" id="nwatt" placeholder="500" min="1"></div>
+      </div>
+      <div class="g2f">
+        <div class="fld"><label>사이클 시간 (분, 없으면 0)</label><input type="number" id="ncyc" placeholder="60" min="0"></div>
+        <div class="fld"><label>1회 전기 (Wh, 없으면 0)</label><input type="number" id="nwh" placeholder="500" min="0"></div>
+      </div>
+    </div>
+    <button class="mbtn mbtn-p" onclick="addApp()">➕ 추가</button>
+    <button class="mbtn mbtn-s" onclick="closeM('appm')">닫기</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════ 상수 ════════════════════════════
+const MAX_W  = 3000;
+const TICK   = 100;
+const KR     = {Mokpo:'목포',Gwangju:'광주',Seoul:'서울',Busan:'부산',
+                Yeosu:'여수',Suncheon:'순천',Naju:'나주',Jindo:'진도',
+                Haenam:'해남',Goheung:'고흥'};
+const WICO   = {800:'☀️',801:'🌤️',802:'⛅',803:'🌥️',804:'☁️'};
+const wico   = id => WICO[id]||(String(id)[0]==='5'?'🌧️':'🌤️');
+const SC     = [
+  {id:800,cloud:5, desc:'맑음',     wf:1.00},
+  {id:801,cloud:25,desc:'구름 조금',wf:0.75},
+  {id:802,cloud:50,desc:'구름 많음',wf:0.52},
+  {id:803,cloud:75,desc:'흐림',     wf:0.30},
+  {id:500,cloud:90,desc:'비',       wf:0.08},
+];
+const DEFAULT_APPS = [
+  {id:'a1',ico:'🧊',name:'냉장고',      minW:200, watt:150, cycleMin:null,whPer:null},
+  {id:'a2',ico:'🫧',name:'세탁기',      minW:600, watt:500, cycleMin:60,  whPer:500},
+  {id:'a3',ico:'🍽️',name:'식기세척기',  minW:1000,watt:1200,cycleMin:90,  whPer:1800},
+  {id:'a4',ico:'❄️',name:'에어컨',      minW:1500,watt:1500,cycleMin:null,whPer:null},
+  {id:'a5',ico:'🤖',name:'로봇 청소기', minW:100, watt:60,  cycleMin:60,  whPer:60},
+  {id:'a6',ico:'💧',name:'제습기',      minW:300, watt:300, cycleMin:null,whPer:null},
+  {id:'a7',ico:'💨',name:'공기청정기',  minW:200, watt:80,  cycleMin:null,whPer:null},
+  {id:'a8',ico:'🍚',name:'밥솥',        minW:800, watt:700, cycleMin:30,  whPer:350},
+  {id:'a9',ico:'♻️',name:'음식물 건조통',minW:400, watt:300, cycleMin:120, whPer:600},
+];
+
+// ═══════════════════════ 상태 ════════════════════════════
+let apps = (() => {
+  const saved = JSON.parse(localStorage.getItem('solar_apps')||'null');
+  // 저장된 앱이 없거나 구버전(3개 이하)이면 새 기본값 사용
+  if(!saved || saved.length < 4) return JSON.parse(JSON.stringify(DEFAULT_APPS));
+  return saved;
+})();
+let cfg       = JSON.parse(localStorage.getItem('solar_cfg')||'{}');
+let selPlan   = new Set(); // 사용자가 체크한 가전
+
+// 가전별 상태 추적
+// status: 'idle'|'running'|'protected'|'done'
+// ★ usedWh는 사이클 완료 시에만 확정 (실행 중 누적 아님)
+let appState  = {}; // {id: {status, startH, startTs, endH, endTs, usedWh, cycleRem, cycleTotal}}
+
+let relayOn   = {};
+let curPow    = 0;
+let curWf     = 1.0;
+let curH      = 9.0;
+let isDemoMode= false;
+let demoIv    = null;
+let demoSpeed = 1;
+let demoSc    = 0;
+let demoHour  = 9.0;
+let eRate     = parseInt(cfg.eRate||150);
+
+// 총 절약량 (완료된 사이클의 확정값만 합산)
+function totalSavedWh(){
+  // 완료된 사이클 확정값 + 진행 중인 가전의 현재까지 소비량
+  return apps.reduce((sum, a) => {
+    const st = appState[a.id];
+    if(!st) return sum;
+    if(st.usedWh > 0) {
+      // 완료된 경우 (사이클 완료 또는 상시 누적)
+      sum += st.usedWh;
+    } else if(relayOn[a.id] && st.startH != null) {
+      // 사이클 있는 가전 진행 중: 경과 시간 × 소비전력
+      const h = isDemoMode ? demoHour : (new Date().getHours() + new Date().getMinutes()/60);
+      const elapsedH = Math.max(0, h - st.startH);
+      sum += a.watt * elapsedH;
+    }
+    return sum;
+  }, 0);
+}
+
+// ════════════════════ 24시간 차트 ════════════════════════
+const SLOTS  = 48;
+let cArr     = new Array(SLOTS).fill(0);
+const cLabels= Array.from({length:SLOTS},(_,i)=>i%4===0?(i/2)+'시':'');
+const chart  = new Chart(document.getElementById('pwc').getContext('2d'),{
+  type:'line',
+  data:{labels:cLabels,datasets:[{
+    data:[...cArr],borderColor:'#F59E0B',backgroundColor:'rgba(245,158,11,.15)',
+    borderWidth:2,tension:0.3,fill:true,pointRadius:0,spanGaps:true
+  }]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:'#94A3B8',font:{size:8},maxTicksLimit:13},grid:{color:'#334155'}},
+      y:{beginAtZero:true,max:3200,ticks:{color:'#94A3B8',font:{size:8}},grid:{color:'#334155'}}
+    }
+  }
+});
+function putChart(h,pw){
+  const s=Math.min(Math.floor(h*2),SLOTS-1);
+  cArr[s]=Math.round(pw);
+  chart.data.datasets[0].data=[...cArr];
+  chart.update('none');
+}
+function resetChart(){cArr=new Array(SLOTS).fill(0);chart.data.datasets[0].data=[...cArr];chart.update('none');}
+
+// ════════════════════ 계산 함수 ══════════════════════════
+function calcTF(h){return(h<6||h>18)?0:Math.max(0,Math.sin(((h-6)/12)*Math.PI));}
+function computeCds(h,wf){
+  const tf=calcTF(h); if(tf<=0)return 0;
+  const eff=parseFloat(document.getElementById('deff').value)||0.9;
+  const noise=0.88+Math.random()*0.24;
+  return Math.max(0,Math.min(1,eff*tf*noise));
+}
+
+// ★ 스마트 시간대 계산: cycleMin 분 동안 연속으로 minW 이상 보장되는 최초 시각
+function findSafeWindow(app, fromH){
+  const sc   = isDemoMode?SC[demoSc]:null;
+  const wf   = sc?sc.wf:curWf;
+  const eff  = parseFloat(document.getElementById('deff').value)||0.9;
+  const need = app.cycleMin||0;
+  let   runStart=null, runLen=0;
+  for(let h=Math.max(fromH,6); h<=18.1; h+=0.25){
+    const tf=calcTF(h);
+    const pw=MAX_W*eff*tf*wf;
+    if(pw>=app.minW){
+      if(runStart===null) runStart=h;
+      runLen=(h-runStart+0.25)*60; // 분
+      if(runLen>=need) return runStart;
+    } else {
+      runStart=null; runLen=0;
+    }
+  }
+  return null; // 오늘 불가
+}
+
+// 타임라인 업데이트
+function updTL(h,wf){
+  h=h!==undefined?h:curH; wf=wf!==undefined?wf:curWf;
+  document.getElementById('tln').style.left=(h/24*100)+'%';
+  const sh=(1-wf)*0.08;
+  const pl=Math.max(0.25+sh,0.27)*100, pw=Math.max((0.5-sh*2)*100,3);
+  const pk=document.getElementById('tlp');
+  pk.style.left=pl+'%'; pk.style.width=pw+'%'; pk.style.opacity=Math.max(0.1,wf*0.9+0.05);
+  const sc=isDemoMode?SC[demoSc]:null;
+  document.getElementById('tlnote').textContent=sc?`(${sc.desc} 기준)`:'';
+}
+
+// ════════════════════ 릴레이 제어 ════════════════════════
+// ESS 없음: 발전량 >= minW 이면 즉시 ON, 사이클 완료 후 재기동 없음
+function autoRelay(pw){
+  apps.concat(DEFAULT_APPS.filter(a=>!apps.find(x=>x.id===a.id))).forEach(()=>{}); // noop
+  const all = apps;
+  all.forEach(a=>{
+    if(!selPlan.has(a.id)){relayOn[a.id]=false;return;}
+    const st=appState[a.id]||{status:'idle'};
+    if(st.status==='done'){relayOn[a.id]=false;return;}
+    const ca=(st.cycleRem||0)>0;
+    if(ca){
+      relayOn[a.id]=true; // 사이클 보호
+    } else if(pw>=a.minW){
+      if(!relayOn[a.id]){
+        relayOn[a.id]=true;
+        // 사이클 시작
+        const h=isDemoMode?demoHour:(new Date().getHours()+new Date().getMinutes()/60);
+        const hh=Math.floor(h),mm=Math.round((h%1)*60);
+        const ts=`${hh}:${mm<10?'0':''}${mm}`;
+        appState[a.id]={
+          status:'running',
+          startH:h,startTs:ts,
+          endH:null,endTs:null,
+          usedWh:0,
+          cycleRem:a.cycleMin||0,
+          cycleTotal:a.cycleMin||0
+        };
+      } else {
+        appState[a.id].status='running';
+      }
+    } else {
+      if(relayOn[a.id]&&(appState[a.id]?.cycleRem||0)<=0){
+        relayOn[a.id]=false;
+        if(appState[a.id]) appState[a.id].status='idle';
+      }
+    }
+  });
+}
+
+// 사이클 타이머 감소 (데모 배속 반영)
+function tickCycles(vm){
+  apps.forEach(a=>{
+    if(!selPlan.has(a.id)) return;
+    const st=appState[a.id];
+    if(!st||st.status==='done'||!relayOn[a.id]) return;
+    if(!a.cycleMin){
+      // 사이클 없는 가전: 발전 중에만 작동, usedWh는 매 틱 누적
+      if(relayOn[a.id]) st.usedWh = (st.usedWh||0) + a.watt * (vm/60);
+      return;
+    }
+    if((st.cycleRem||0)>0){
+      st.cycleRem = Math.max(0, st.cycleRem - vm);
+      st.status = 'running';
+      if(st.cycleRem<=0){
+        // ★ 사이클 완료 — usedWh 확정, 더 이상 누적 안 함
+        st.usedWh = a.watt * (a.cycleMin/60); // 정확한 값
+        const h=isDemoMode?demoHour:(new Date().getHours()+new Date().getMinutes()/60);
+        const hh=Math.floor(h),mm=Math.round((h%1)*60);
+        st.endH=h; st.endTs=`${hh}:${mm<10?'0':''}${mm}`;
+        st.status='done';
+        relayOn[a.id]=false;
+      }
+    }
+  });
+}
+
+
+// 현재 ON 상태 가전의 순간 소비 전력 합계
+function calcCurrentUsage(){
+  return apps.reduce((sum, a) => {
+    if(relayOn[a.id]) sum += a.watt;
+    return sum;
+  }, 0);
+}
+
+// 사용자가 선택한 가전 동시 작동 시 최대 소비 전력 합계
+function calcSelectedMaxUsage(){
+  return apps.reduce((sum, a) => {
+    if(selPlan.has(a.id)) sum += a.watt;
+    return sum;
+  }, 0);
+}
+
+function updUsageBox(){
+  const curW  = calcCurrentUsage();
+  const selW  = calcSelectedMaxUsage();
+  const over  = selW > MAX_W;
+
+  // 현재 사용 전력 색상: 70% 이상이면 주황, 100% 이상이면 빨강
+  const ratio = curW / MAX_W;
+  const curColor = ratio >= 1 ? 'var(--rd)' : ratio >= 0.7 ? 'var(--sun)' : 'var(--gn)';
+
+  document.getElementById('vcur').innerHTML =
+    `<span style="color:${curColor};">${curW}</span> <span style="font-size:.7rem;color:var(--mt);">W</span>`;
+
+  const selColor = over ? 'var(--rd)' : selW > MAX_W*0.8 ? 'var(--sun)' : 'var(--tx)';
+  document.getElementById('vsel').innerHTML =
+    `<span style="color:${selColor};">${selW}</span> <span style="font-size:.65rem;color:var(--mt);">W</span>`;
+
+  // 초과 경고
+  const warn = document.getElementById('overload-warn');
+  if(over){
+    warn.style.display = 'block';
+    document.getElementById('vover').textContent = selW.toLocaleString();
+    // usage-box 테두리도 빨갛게
+    document.getElementById('usage-box').style.borderColor = 'rgba(239,68,68,.5)';
+  } else {
+    warn.style.display = 'none';
+    document.getElementById('usage-box').style.borderColor = 'var(--bd)';
+  }
+}
+// ════════════════════ 가전 카드 렌더링 ═══════════════════
+function fmtH(h){const hh=Math.floor(h),mm=Math.round((h%1)*60);return `${hh}:${mm<10?'0':''}${mm}`;}
+
+function renderAppCards(){
+  const el=document.getElementById('app-list'); el.innerHTML='';
+  if(!apps.length){
+    el.innerHTML='<div style="color:var(--mt);font-size:11px;padding:10px;text-align:center;grid-column:1/-1;">등록된 가전이 없습니다.</div>';
+    return;
+  }
+  apps.forEach(a=>{
+    const sel=selPlan.has(a.id);
+    const st=appState[a.id]||{status:'idle'};
+    const on=relayOn[a.id];
+    const ca=(st.cycleRem||0)>0;
+
+    // 상태 결정
+    let sbClass='sb-off', sbText='미선택';
+    if(!sel){sbClass='sb-off'; sbText='미선택';}
+    else if(st.status==='done'){sbClass='sb-done'; sbText='완료 ✅';}
+    else if(ca){sbClass='sb-lock'; sbText='보호중 🔒';}
+    else if(on){sbClass='sb-on'; sbText='ON 작동중';}
+    else{sbClass='sb-off'; sbText='대기중';}
+
+    let acCls='ac';
+    if(!sel) acCls+=' ac-unsel';
+    else if(st.status==='done') acCls+=' ac-done';
+    else if(ca) acCls+=' ac-lock';
+    else if(on) acCls+=' ac-on';
+
+    // ── 예상/실제 값 계산 ───────────────────────────────
+    // 사이클 있는 가전: 1회 예상 전기
+    const estWh = a.whPer || (a.cycleMin ? Math.round(a.watt*a.cycleMin/60) : null);
+    const estWon= estWh ? Math.round(estWh/1000*eRate) : null;
+    const estCO2= estWh ? (estWh/1000*0.4781).toFixed(3) : null;
+    // 실제 완료된 값
+    const actWh = st.usedWh||0;
+    const actWon= Math.round(actWh/1000*eRate);
+    const actCO2= (actWh/1000*0.4781).toFixed(3);
+
+    // ── 시간 정보 ────────────────────────────────────────
+    const showStart = st.startTs || '—';
+    let showEnd='—', showDur='—';
+    if(st.endTs){ showEnd=st.endTs; showDur=Math.round((st.endH-st.startH)*60)+'분'; }
+    else if(on||ca){
+      const h=isDemoMode?demoHour:(new Date().getHours()+new Date().getMinutes()/60);
+      const elapsed=Math.round((h-(st.startH||h))*60);
+      showEnd='진행중'; showDur=elapsed+'분 경과';
+    }
+
+    // ── 사이클 진행 바 ───────────────────────────────────
+    const progPct = a.cycleMin&&(st.cycleRem||0)>0
+      ? Math.round((1-st.cycleRem/st.cycleTotal)*100)
+      : (st.status==='done'?100:0);
+    const progBar = (a.cycleMin&&(on||ca||st.status==='done'))
+      ? `<div class="cyc-bar"><div class="cyc-barf" style="width:${progPct}%;"></div></div>` : '';
+
+    // ── 스케줄 추천 ─────────────────────────────────────
+    let schedInfo='';
+    if(sel && st.status==='idle' && !on){
+      const swH=findSafeWindow(a, isDemoMode?demoHour:(new Date().getHours()+new Date().getMinutes()/60));
+      const sc=isDemoMode?SC[demoSc]:null;
+      if(swH!==null){
+        const hh=Math.floor(swH),mm=Math.round((swH-hh)*60);
+        const ts=`${hh}시${mm>0?' '+mm+'분':''}`;
+        schedInfo=`<div class="ac-sched as-ok">✅ 안전 시작 시각: <b>${ts}</b>${a.cycleMin?' ('+a.cycleMin+'분 연속 발전 보장)':''}</div>`;
+      } else {
+        const simpler=apps.filter(x=>selPlan.has(x.id)&&x.minW<a.minW&&x.id!==a.id&&findSafeWindow(x,isDemoMode?demoHour:0)!==null);
+        if(simpler.length){
+          schedInfo=`<div class="ac-sched as-warn">⚠️ 오늘 작동 불가 — 대신 <b>${simpler.map(x=>x.name).join(', ')}</b> 먼저 추천</div>`;
+        } else {
+          schedInfo=`<div class="ac-sched as-bad">❌ 오늘 발전량 부족 — 날씨 개선 후 재시도</div>`;
+        }
+      }
+    }
+
+    // ── 카드 HTML ────────────────────────────────────────
+    const div=document.createElement('div');
+    div.className=acCls; div.id='acard-'+a.id;
+    div.innerHTML=`
+      <div class="ac-top">
+        <label style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer;min-width:0;">
+          <input type="checkbox" class="ac-chk" ${sel?'checked':''}
+            onchange="togPlan('${a.id}',this.checked);event.stopPropagation();">
+          <span class="ac-ico">${a.ico}</span>
+          <div class="ac-info" style="min-width:0;">
+            <div class="ac-name">${a.name}</div>
+            <div class="ac-spec">작동기준 ${a.minW}W · 소비 ${a.watt}W${a.cycleMin?' · '+a.cycleMin+'분':'  · 상시'}</div>
+          </div>
+        </label>
+        <span class="sb ${sbClass}" style="flex-shrink:0;">${sbText}</span>
+      </div>
+      <div class="ac-detail">
+        ${progBar}
+        <div class="ac-info-row">
+          <div class="ac-iitem"><div class="ac-ilbl">시작</div><div class="ac-ival">${showStart}</div></div>
+          <div class="ac-iitem"><div class="ac-ilbl">완료</div><div class="ac-ival">${showEnd}</div></div>
+          <div class="ac-iitem"><div class="ac-ilbl">소요</div><div class="ac-ival">${showDur}</div></div>
+          <div class="ac-iitem"><div class="ac-ilbl">전기</div><div class="ac-ival" style="color:${actWh>0?'var(--sun)':'var(--mt)'};">${actWh>0?actWh.toFixed(0)+'Wh':estWh?estWh+'Wh':a.watt+'W'}</div></div>
+          <div class="ac-iitem"><div class="ac-ilbl">절약</div><div class="ac-ival" style="color:${actWon>0?'var(--gn)':'var(--mt)'};">${actWon>0?actWon+'원':estWon?estWon+'원':'—'}</div></div>
+          <div class="ac-iitem"><div class="ac-ilbl">CO₂</div><div class="ac-ival" style="color:${parseFloat(actCO2)>0?'#6EE7B7':'var(--mt)'};">${parseFloat(actCO2)>0?actCO2+'kg':estCO2?estCO2+'kg':'—'}</div></div>
+        </div>
+        ${schedInfo}
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+
+// ★ 카드 상태만 부분 업데이트 (DOM 재생성 없음 → 체크박스 유지)
+function updCardStates(){
+  apps.forEach(a=>{
+    const card=document.getElementById('acard-'+a.id);
+    if(!card) return;
+    const sel=selPlan.has(a.id);
+    const st=appState[a.id]||{status:'idle'};
+    const on=relayOn[a.id];
+    const ca=(st.cycleRem||0)>0;
+
+    // 카드 테두리 클래스
+    let acCls='ac';
+    if(!sel) acCls+=' ac-unsel';
+    else if(st.status==='done') acCls+=' ac-done';
+    else if(ca) acCls+=' ac-lock';
+    else if(on) acCls+=' ac-on';
+    card.className=acCls;
+
+    // 상태 배지
+    const sb=card.querySelector('.sb');
+    if(sb){
+      let sbClass='sb-off', sbText='미선택';
+      if(!sel){sbClass='sb-off';sbText='미선택';}
+      else if(st.status==='done'){sbClass='sb-done';sbText='완료 ✅';}
+      else if(ca){sbClass='sb-lock';sbText='보호중 🔒';}
+      else if(on){sbClass='sb-on';sbText='ON 작동중';}
+      else{sbClass='sb-off';sbText='대기중';}
+      sb.className='sb '+sbClass;
+      sb.textContent=sbText;
+    }
+
+    // 진행 바
+    const progPct=a.cycleMin&&(st.cycleRem||0)>0
+      ?Math.round((1-st.cycleRem/st.cycleTotal)*100):(st.status==='done'?100:0);
+    const pbf=card.querySelector('.cyc-barf');
+    if(pbf) pbf.style.width=progPct+'%';
+
+    // 6칸 한 줄 업데이트
+    const ivals=card.querySelectorAll('.ac-ival');
+    if(ivals.length>=6){
+      ivals[0].textContent=st.startTs||'—';
+      if(st.endTs){ivals[1].textContent=st.endTs;ivals[2].textContent=Math.round((st.endH-st.startH)*60)+'분';}
+      else if(on||ca){
+        const h=isDemoMode?demoHour:(new Date().getHours()+new Date().getMinutes()/60);
+        const elapsed=Math.max(0,Math.round((h-(st.startH||h))*60));
+        ivals[1].textContent='진행중'; ivals[2].textContent=elapsed+'분';
+      }else{ivals[1].textContent='—'; ivals[2].textContent='—';}
+      if(st.usedWh>0){
+        const wh=st.usedWh;
+        ivals[3].textContent=wh.toFixed(0)+'Wh'; ivals[3].style.color='var(--sun)';
+        ivals[4].textContent=Math.round(wh/1000*eRate)+'원'; ivals[4].style.color='var(--gn)';
+        ivals[5].textContent=(wh/1000*0.4781).toFixed(3)+'kg'; ivals[5].style.color='#6EE7B7';
+      }
+    }
+  });
+  updUsageBox();
+}
+
+// 결과 배너
+function updResultBanner(){
+  const ban=document.getElementById('result-banner');
+  const sel=[...selPlan];
+  if(!sel.length){ban.style.display='none';return;}
+  const done=sel.filter(id=>(appState[id]?.status)==='done');
+  const running=sel.filter(id=>relayOn[id]||(appState[id]?.cycleRem||0)>0);
+  const waiting=sel.filter(id=>!relayOn[id]&&(appState[id]?.status||'idle')==='idle'&&(appState[id]?.status)!=='done');
+  if(done.length>0&&running.length===0&&waiting.length===0){
+    ban.className='rb-ok'; ban.style.display='block';
+    const total=totalSavedWh();
+    ban.innerHTML=`✅ 오늘 선택한 가전 작동 완료! 총 ${(total/1000).toFixed(2)}kWh 사용 · ${Math.round(total/1000*eRate)}원 절약`;
+  } else if(running.length>0){
+    ban.className='rb-warn'; ban.style.display='block';
+    const names=running.map(id=>apps.find(a=>a.id===id)?.name||id).join(', ');
+    ban.innerHTML=`🔄 작동 중: ${names}`;
+  } else {
+    ban.style.display='none';
+  }
+}
+
+// 계획 체크 토글
+function togPlan(id,checked){
+  if(checked) selPlan.add(id);
+  else{
+    selPlan.delete(id); relayOn[id]=false;
+    if(appState[id]?.status!=='done') delete appState[id];
+  }
+  renderAppCards();
+  updUsageBox();
+}
+
+// 전체 초기화
+function resetAll(){
+  selPlan.clear(); relayOn={}; appState={};
+  renderAppCards();
+  updUsageBox();
+}
+
+// 절약 요약
+function updSavings(){
+  const wh=totalSavedWh();
+  const kwh=wh/1000;
+  const won=Math.round(kwh*eRate);
+  document.getElementById('vsave').textContent=won.toLocaleString();
+  document.getElementById('vkwh').textContent=kwh.toFixed(2);
+  document.getElementById('vco2').textContent=(kwh*0.4781).toFixed(3);
+  document.getElementById('vrate').textContent=eRate;
+}
+
+// ════════════════════ 메인 UI 업데이트 ═══════════════════
+function updateUI(d){
+  const pw =parseFloat(d.power_W||0);
+  const cf =parseFloat(d.cds_factor||0);
+  const wf =parseFloat(d.weather_factor||0);
+  const tf =parseFloat(d.time_factor||0);
+  const cl =parseInt(d.cloud_pct||0);
+  const wid=parseInt(d.weather_id||800);
+  curPow=pw; curWf=wf;
+  curH=isDemoMode?demoHour:(new Date().getHours()+new Date().getMinutes()/60);
+
+  autoRelay(pw);
+
+  document.getElementById('lpow').textContent=Math.round(pw)+' W';
+  document.getElementById('vp').textContent=Math.round(pw);
+  document.getElementById('pb').style.width=Math.min(pw/MAX_W*100,100)+'%';
+  document.getElementById('fc').textContent='CdS '+cf.toFixed(2);
+  document.getElementById('fw').textContent='날씨 '+wf.toFixed(2);
+  document.getElementById('ft').textContent='시간 '+tf.toFixed(2);
+  document.getElementById('fr').textContent=Math.round(pw);
+  document.getElementById('wico').textContent=wico(wid);
+  document.getElementById('wdesc').textContent=d.weather_desc||'-';
+  document.getElementById('wcl').textContent=cl;
+  document.getElementById('wot').textContent=parseFloat(d.outside_temp||0).toFixed(1);
+  document.getElementById('vt').textContent=parseFloat(d.temperature||0).toFixed(1);
+  document.getElementById('tc').textContent=cf.toFixed(2); document.getElementById('bc').style.width=(cf*100)+'%';
+  document.getElementById('tw').textContent=wf.toFixed(2); document.getElementById('bw').style.width=(wf*100)+'%';
+  document.getElementById('tt').textContent=tf.toFixed(2); document.getElementById('bt').style.width=(tf*100)+'%';
+
+  updTL(curH,wf);
+  putChart(curH,pw);
+  updUsageBox();
+  updSavings();
+  updCardStates(); // 카드 DOM 재생성 없이 상태만 업데이트
+
+  const hh=Math.floor(curH),mm=Math.round((curH%1)*60);
+  document.getElementById('ts').textContent=`${hh}:${mm<10?'0':''}${mm}`;
+  document.getElementById('sdot').classList.add('live');
+}
+
+// ════════════════════ 데모 모드 ══════════════════════════
+function demoTick(){
+  if(demoSpeed===0)return;
+  demoHour += demoSpeed*TICK/60000;
+  if(demoHour>=24){demoHour-=24;appState={};relayOn={};resetChart();}
+  const vm=demoSpeed*TICK/1000; // 가상 분/틱
+  tickCycles(vm);
+  const hv=Math.floor(demoHour),mv=Math.round((demoHour-hv)*60);
+  document.getElementById('dh').value=Math.min(demoHour,23.99);
+  document.getElementById('dhv').textContent=hv+':'+(mv<10?'0':'')+mv;
+  const sc=SC[demoSc];
+  const tf=calcTF(demoHour);
+  const cf=computeCds(demoHour,sc.wf);
+  const pw=MAX_W*cf*sc.wf;
+  updateUI({power_W:pw,cds_factor:cf,weather_factor:sc.wf,time_factor:tf,
+    cloud_pct:sc.cloud,weather_id:sc.id,weather_desc:sc.desc,
+    outside_temp:(15+Math.random()*12).toFixed(1),temperature:(20+Math.random()*8).toFixed(1)});
+}
+
+function setSc(i){
+  demoSc=i;
+  document.querySelectorAll('.sc-btn').forEach((b,j)=>b.classList.toggle('on',j===i));
+  renderAppCards();
+}
+function onHS(v){
+  demoHour=parseFloat(v);
+  const h=Math.floor(demoHour),m=Math.round((demoHour-h)*60);
+  document.getElementById('dhv').textContent=h+':'+(m<10?'0':'')+m;
+  updTL(demoHour,SC[demoSc].wf);
+}
+function setSp(s,btn){
+  demoSpeed=s;
+  document.querySelectorAll('.sp-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+}
+function startDemo(){
+  isDemoMode=true; demoHour=9.0; appState={}; relayOn={};
+  // 사용자가 직접 체크 — 자동 선택 안 함
+  renderAppCards();
+  if(demoIv)clearInterval(demoIv);
+  demoIv=setInterval(demoTick,TICK);
+}
+function togDP(){
+  const dp=document.getElementById('dp');
+  const open=dp.classList.toggle('open');
+  document.getElementById('wrap').classList.toggle('dp-open',open);
+  if(open&&!isDemoMode)startDemo();
+}
+
+// ════════════════════ 가전 등록 ══════════════════════════
+let selIcoChar='💨';
+function selIco(el){document.querySelectorAll('.ico').forEach(e=>e.classList.remove('s'));el.classList.add('s');selIcoChar=el.textContent;}
+function openAppM(){buildALM();document.getElementById('appm').style.display='flex';}
+function buildALM(){
+  const el=document.getElementById('alm'); el.innerHTML='';
+  apps.forEach(a=>{
+    const d=document.createElement('div'); d.className='ali';
+    d.innerHTML=`<span style="font-size:1.2rem;">${a.ico}</span>
+      <div style="flex:1;"><div style="font-size:11px;font-weight:600;">${a.name}</div>
+      <div style="font-size:9px;color:var(--mt);">기준 ${a.minW}W · 소비 ${a.watt}W${a.cycleMin?' · '+a.cycleMin+'분':''}</div></div>
+      <button class="adl" onclick="delApp('${a.id}')">✕</button>`;
+    el.appendChild(d);
+  });
+  if(!apps.length) el.innerHTML='<div style="color:var(--mt);font-size:11px;text-align:center;padding:8px;">등록된 가전 없음</div>';
+}
+function addApp(){
+  const name=document.getElementById('nn').value.trim();
+  const minW=parseInt(document.getElementById('nminw').value)||0;
+  const watt=parseInt(document.getElementById('nwatt').value)||0;
+  const cyc =parseInt(document.getElementById('ncyc').value)||0;
+  const wh  =parseInt(document.getElementById('nwh').value)||0;
+  if(!name||!minW||!watt){alert('이름, 작동 기준, 소비 전력은 필수입니다.');return;}
+  apps.push({id:'a'+Date.now(),ico:selIcoChar,name,minW,watt,
+    cycleMin:cyc||null,whPer:wh||null});
+  localStorage.setItem('solar_apps',JSON.stringify(apps));
+  buildALM(); renderAppCards();
+  ['nn','nminw','nwatt','ncyc','nwh'].forEach(id=>document.getElementById(id).value='');
+}
+function delApp(id){
+  apps=apps.filter(a=>a.id!==id); selPlan.delete(id); delete appState[id];
+  localStorage.setItem('solar_apps',JSON.stringify(apps));
+  buildALM(); renderAppCards();
+}
+
+// ════════════════════ 설정 / Firebase ════════════════════
+function openSetM(){
+  if(cfg.city){const s=document.getElementById('csel');for(let o of s.options)if(o.value===cfg.city){s.value=cfg.city;break;}}
+  if(cfg.fburl)document.getElementById('fburl').value=cfg.fburl;
+  if(cfg.fbapikey)document.getElementById('fbapikey').value=cfg.fbapikey;
+  if(cfg.fbpid)document.getElementById('fbpid').value=cfg.fbpid;
+  if(cfg.eRate)document.getElementById('erate').value=cfg.eRate;
+  document.getElementById('setm').style.display='flex';
+}
+function saveSet(){
+  const sel=document.getElementById('csel').value;
+  const city=sel==='c'?(document.getElementById('ccity').value.trim()||'Mokpo'):sel;
+  cfg={city,fburl:document.getElementById('fburl').value.trim(),
+       fbapikey:document.getElementById('fbapikey').value.trim(),
+       fbpid:document.getElementById('fbpid').value.trim(),
+       eRate:document.getElementById('erate').value};
+  eRate=parseInt(cfg.eRate)||150;
+  localStorage.setItem('solar_cfg',JSON.stringify(cfg));
+  document.getElementById('loc').textContent='📍 '+(KR[city]||city);
+  closeM('setm');
+  if(cfg.fburl&&cfg.fbapikey&&cfg.fbpid)connectFB();
+}
+
+let lastRealMs=Date.now();
+function connectFB(){
+  try{
+    if(demoIv){clearInterval(demoIv);isDemoMode=false;}
+    const app=firebase.initializeApp({
+      apiKey:cfg.fbapikey,authDomain:cfg.fbpid+'.firebaseapp.com',
+      databaseURL:'https://'+cfg.fburl,projectId:cfg.fbpid},'app');
+    firebase.database(app).ref('/solarData/realtime').on('value',s=>{
+      if(!s.val())return;
+      const now=Date.now();
+      const dtH=(now-lastRealMs)/3600000;
+      lastRealMs=now;
+      const realMin=dtH*60;
+      tickCycles(realMin); // 실제 경과 시간으로 사이클 처리
+      checkMidnight();
+      curPow=parseFloat(s.val().power_W||0);
+      updateUI(s.val());
+    });
+    renderAppCards();
+  }catch(e){alert('Firebase 연결 실패: '+e.message);}
+}
+function checkMidnight(){
+  const today=new Date().toDateString();
+  if(localStorage.getItem('solar_day')!==today){
+    appState={}; relayOn={}; resetChart();
+    localStorage.setItem('solar_day',today);
+  }
+}
+function closeM(id){document.getElementById(id).style.display='none';}
+
+// 실제 모드 주기 업데이트
+setInterval(()=>{if(!isDemoMode){updTL();updCardStates();}},10000);
+
+// ════════════════════ 초기화 ══════════════════════════════
+document.getElementById('loc').textContent='📍 '+(KR[cfg.city||'Mokpo']||cfg.city||'목포');
+eRate=parseInt(cfg.eRate||150);
+checkMidnight();
+// 기본 미선택 — 사용자가 직접 체크
+renderAppCards();
+updSavings();
+updTL(9,1);
+
+if(cfg.fburl&&cfg.fbapikey&&cfg.fbpid){
+  connectFB();
+} else {
+  // 데모 자동 시작
+  document.getElementById('dp').classList.add('open');
+  document.getElementById('wrap').classList.add('dp-open');
+  startDemo();
+}
+</script>
+</body>
+</html>
